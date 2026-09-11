@@ -3,8 +3,8 @@
 A Chrome extension that filters your X feed with a language model, using rules
 you write in plain English. It also removes ads and shows usage statistics.
 
-The default backend is Chrome's built-in Gemini Nano, which runs entirely on your device.
-OpenAI and Anthropic models are optional, with your own API key.
+The default model is OpenAI's `gpt-5.6-luna` (bring your own API key). Anthropic models and
+Chrome's built-in Gemini Nano, which runs entirely on your device, are also supported.
 
 <p>
   <img src="docs/feed.png" alt="Filtered posts collapsed on the X timeline, each labeled with the author's handle and the model's reason" width="100%">
@@ -22,8 +22,8 @@ No build step. Requires Chrome 138+.
 1. Clone this repo.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the repo folder.
 3. Click the Prism toolbar icon to open its settings:
-   - **Model**: Chrome built-in (click **Download model** the first time; a few GB, and Chrome
-     wants ~22 GB free disk), or OpenAI / Anthropic with an API key.
+   - **Model**: OpenAI (default) or Anthropic with an API key, or Chrome built-in (click
+     **Download model** the first time; a few GB, and Chrome wants ~22 GB free disk).
    - **Filter rules**: what to hide. **Try it** tests the rules against a single post.
 4. Open x.com. Filtered posts are blurred (or collapsed) with a "Filtered" label; click one to
    show it. Options can add the author's @handle and the model's reason to the label.
@@ -70,4 +70,4 @@ content.js (isolated world)  ◀───────────┘          �
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The icon is Lucide's `pyramid` ([ISC](icons/LICENSE)).

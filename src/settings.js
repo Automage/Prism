@@ -9,7 +9,7 @@ Keep everything else, including strong opinions backed by real arguments, news, 
 
 export const DEFAULTS = {
   enabled: true,
-  provider: 'chrome-builtin',
+  provider: 'openai',
   providerConfig: {}, // per-provider options (API keys, model ids), keyed by provider id
   policy: DEFAULT_POLICY,
   mode: 'blur', // 'blur' | 'collapse'
