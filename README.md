@@ -6,6 +6,11 @@ you write in plain English. It also removes ads and shows usage statistics.
 The default backend is Chrome's built-in Gemini Nano, which runs entirely on your device.
 OpenAI and Anthropic models are optional, with your own API key.
 
+<p>
+  <img src="docs/settings.png" alt="Prism settings: model, API key, reasoning effort and filter rules" width="49%">
+  <img src="docs/stats.png" alt="Prism settings: display options, Try it, and feed stats" width="49%">
+</p>
+
 ## Install
 
 No build step. Requires Chrome 138+.
