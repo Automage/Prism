@@ -70,4 +70,4 @@ content.js (isolated world)  ◀───────────┘          �
 
 ## License
 
-[MIT](LICENSE). The icon is Lucide's `pyramid` ([ISC](icons/LICENSE)).
+[MIT](LICENSE)
