@@ -1,0 +1,88 @@
+/* State lives in data attributes on X's own <article> elements; the label is a
+   pseudo-element so we never insert nodes into React-managed trees. */
+
+article[data-ic] {
+  position: relative;
+}
+/* Clicking these reveals them. */
+article[data-ic='filtered'],
+article[data-ic-hold] {
+  cursor: pointer;
+}
+
+article[data-ic] > div {
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+article[data-ic]::after {
+  font: 500 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: rgb(113, 118, 123);
+  pointer-events: none;
+}
+
+/* Ads: removed outright. Hiding the whole timeline cell (not just the article) leaves no
+   gap or divider; X's virtualized list re-measures the cell and closes up. */
+[data-testid='cellInnerDiv']:has(article[data-ic='ad']),
+article[data-ic='ad'] {
+  display: none !important;
+}
+
+/* Waiting for a verdict (including retries after a provider error): a small spinner in the
+   header, clear of X's own buttons on the right. With "blur until checked" on, the post is
+   also blurred and the spinner moves to its center. */
+@keyframes prism-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+article[data-ic='pending']::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  right: 76px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(113 118 123 / 0.3);
+  border-top-color: rgb(29 155 240);
+  border-radius: 50%;
+  animation: prism-spin 0.8s linear infinite;
+}
+article[data-ic-hold] > div {
+  filter: blur(6px);
+  opacity: 0.5;
+}
+article[data-ic-hold]::after {
+  top: calc(50% - 9px);
+  right: calc(50% - 9px);
+  width: 14px;
+  height: 14px;
+}
+
+/* Filtered: blur */
+article[data-ic='filtered'][data-ic-mode='blur'] > div {
+  filter: blur(14px);
+  opacity: 0.3;
+  pointer-events: none;
+  user-select: none;
+}
+/* Label is "Filtered", or "Filtered · <reason>" with Show reasons on. Click reveals. */
+article[data-ic='filtered'][data-ic-mode='blur']::after {
+  content: attr(data-ic-label);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  text-align: center;
+}
+
+/* Filtered: collapse to a one-line bar */
+article[data-ic='filtered'][data-ic-mode='collapse'] > div {
+  display: none;
+}
+article[data-ic='filtered'][data-ic-mode='collapse']::after {
+  content: attr(data-ic-label);
+  display: block;
+  padding: 10px 16px;
+}

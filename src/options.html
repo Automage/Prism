@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Prism</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fff;
+      --fg: #0f1419;
+      --muted: #536471;
+      --line: #e1e8ed;
+      --accent: #1d9bf0;
+      --ok: #00a36c;
+      --bad: #d93025;
+      --field: #f7f9f9;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #000; --fg: #e7e9ea; --muted: #8b98a5; --line: #2f3336; --field: #16181c; }
+    }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 28px; }
+    section { border-top: 1px solid var(--line); padding: 20px 0; }
+    h2 { font-size: 15px; margin: 0 0 10px; }
+    label { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+    .field { display: block; margin-top: 10px; }
+    .field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    textarea, select, .field input, .field select { width: 100%; box-sizing: border-box; background: var(--field); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; }
+    textarea { min-height: 210px; resize: vertical; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #test-text { min-height: 80px; font: inherit; }
+    button { background: var(--fg); color: var(--bg); border: 0; border-radius: 999px; padding: 8px 16px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .status { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+    .dot.ready { background: var(--ok); }
+    .dot.unavailable { background: var(--bad); }
+    progress { width: 100%; margin-top: 10px; }
+    #test-result { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--field); border: 1px solid var(--line); }
+    #test-result .verdict { font-weight: 700; }
+    #test-result .verdict.filter { color: var(--bad); }
+    #test-result .verdict.keep { color: var(--ok); }
+    details { margin-top: 6px; }
+    pre { white-space: pre-wrap; font-size: 12px; margin: 6px 0 0; }
+
+    /* ---------- stats ---------- */
+    :root {
+      --series-shown: #2a78d6;
+      --series-filtered: #eb6834;
+      --grid: #e1e0d9;
+      --axis: #c3c2b7;
+      --tick: #898781;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --series-shown: #3987e5; --series-filtered: #d95926; --grid: #2c2c2a; --axis: #383835; }
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 14px; }
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+    .seg button { background: transparent; color: var(--muted); padding: 5px 12px; font-size: 13px; }
+    .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
+    .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+    .tile .label { font-size: 13px; color: var(--muted); }
+    .tile .value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+    .tile .note { font-size: 13px; color: var(--muted); }
+    .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--key); }
+    .chart { position: relative; }
+    .chart svg { display: block; width: 100%; overflow: visible; }
+    .chart .tick { fill: var(--tick); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .chart .col:hover .bar, .chart .col:focus .bar { filter: brightness(1.15); }
+    .chart .col:focus { outline: none; }
+    .chart .col:focus .hit { stroke: var(--muted); stroke-width: 1; }
+    .tooltip { position: absolute; pointer-events: none; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); white-space: nowrap; z-index: 1; }
+    .tooltip .date { color: var(--muted); margin-bottom: 4px; }
+    .tooltip .line { display: flex; align-items: center; gap: 6px; }
+    .tooltip .line::before { content: ''; width: 10px; height: 2px; border-radius: 1px; background: var(--key); }
+    .tooltip b { font-weight: 600; }
+    .accounts { display: grid; grid-template-columns: minmax(0, 11rem) 1fr auto; gap: 6px 12px; align-items: center; font-size: 13px; }
+    .accounts a { color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .accounts a:hover { text-decoration: underline; }
+    .accounts .nums { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .hbar { display: flex; gap: 2px; height: 12px; }
+    .hbar i { display: block; height: 100%; min-width: 1px; }
+    .hbar i:last-child { border-radius: 0 4px 4px 0; }
+    .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+    table.days { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+    table.days th, table.days td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+    table.days th:first-child, table.days td:first-child { text-align: left; }
+    table.days th { color: var(--muted); font-weight: 500; }
+    @media (max-width: 520px) { .tiles { grid-template-columns: 1fr 1fr; } .accounts { grid-template-columns: minmax(0, 8rem) 1fr auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Prism</h1>
+    <p class="sub">Filters your X feed with a language model, using rules you write.</p>
+
+    <section>
+      <label><input type="checkbox" id="enabled" /> Enabled</label>
+    </section>
+
+    <section>
+      <h2>Model</h2>
+      <select id="provider"></select>
+      <div id="provider-config"></div>
+      <div class="status"><span class="dot" id="status-dot"></span><span id="status-text">Checking…</span></div>
+      <p class="hint" id="status-detail" hidden></p>
+      <div class="row"><button id="download" hidden>Download model</button></div>
+      <progress id="progress" max="1" value="0" hidden></progress>
+    </section>
+
+    <section>
+      <h2>Filter rules</h2>
+      <p class="hint">Plain English. The model is told to hide a post only when it clearly matches these rules.</p>
+      <textarea id="policy" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="save">Save rules</button>
+        <button class="secondary" id="reset">Reset to default</button>
+        <span class="hint" id="saved" hidden>Saved. Verdicts will be recomputed.</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Display</h2>
+      <label><input type="radio" name="mode" value="blur" /> Blur filtered posts</label>
+      <label><input type="radio" name="mode" value="collapse" /> Collapse filtered posts to a one-line bar</label>
+      <label><input type="checkbox" id="holdPending" /> Blur posts until they've been checked (avoids a flash of filtered content)</label>
+      <label><input type="checkbox" id="showHandle" /> Show the author's @handle on filtered posts</label>
+      <label><input type="checkbox" id="showReasons" /> Show the model's reason on filtered posts</label>
+    </section>
+
+    <section>
+      <h2>Try it</h2>
+      <p class="hint">Runs the rules above (saved or not) against a single post.</p>
+      <textarea id="test-text" placeholder="Paste a tweet…"></textarea>
+      <div class="row"><button id="test">Classify</button></div>
+      <div id="test-result" hidden></div>
+    </section>
+
+    <section id="stats">
+      <h2>Your feed</h2>
+      <div class="controls">
+        <div class="seg" id="stats-period" role="group" aria-label="Period">
+          <button data-period="all">Since install</button>
+          <button data-period="30">30 days</button>
+          <button data-period="7">7 days</button>
+          <button data-period="1">Today</button>
+        </div>
+        <div class="seg" id="stats-view" role="group" aria-label="Group by">
+          <button data-view="day">By day</button>
+          <button data-view="account">By account</button>
+        </div>
+      </div>
+      <div class="tiles" id="stats-tiles"></div>
+      <div id="stats-body"></div>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
