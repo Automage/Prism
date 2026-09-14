@@ -67,7 +67,7 @@
     .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
     .seg button { background: transparent; color: var(--muted); padding: 5px 12px; font-size: 13px; }
     .seg button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
-    .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
     .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
     .tile .label { font-size: 13px; color: var(--muted); }
     .tile .value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
@@ -173,6 +173,16 @@
       </div>
       <div class="tiles" id="stats-tiles"></div>
       <div id="stats-body"></div>
+    </section>
+
+    <section>
+      <h2>Log</h2>
+      <p class="hint">Every post sent to the model, with its verdict and reason, kept on this machine until you clear it. Exports as JSONL (one JSON object per line).</p>
+      <div class="row">
+        <button id="log-export">Export log</button>
+        <button class="secondary" id="log-clear">Clear log</button>
+        <span class="hint" id="log-count"></span>
+      </div>
     </section>
   </main>
   <script type="module" src="options.js"></script>

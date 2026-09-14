@@ -112,6 +112,15 @@ export default {
     if (body.stop_reason === 'refusal') throw new Error('Anthropic declined to classify this batch');
     if (body.stop_reason === 'max_tokens') throw new Error('Anthropic response hit max_tokens');
     const text = body.content?.filter((b) => b.type === 'text').map((b) => b.text).join('') ?? '';
-    return structured ? JSON.parse(text) : extractJSON(text);
+
+    // input_tokens is uncached input only; cache reads and writes are reported separately.
+    const u = body.usage ?? {};
+    const usage = {
+      input: u.input_tokens ?? 0,
+      cached: u.cache_read_input_tokens ?? 0,
+      cacheWrite: u.cache_creation_input_tokens ?? 0,
+      output: u.output_tokens ?? 0,
+    };
+    return { result: structured ? JSON.parse(text) : extractJSON(text), model: body.model ?? model, usage };
   },
 };

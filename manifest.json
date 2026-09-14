@@ -10,7 +10,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "offscreen"],
+  "permissions": ["storage", "unlimitedStorage", "offscreen"],
   "host_permissions": ["https://api.openai.com/*", "https://api.anthropic.com/*"],
   "background": {
     "service_worker": "src/background.js",

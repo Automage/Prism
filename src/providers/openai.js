@@ -78,6 +78,11 @@ export default {
     if (refusal) throw new Error(`OpenAI refused: ${refusal.refusal}`);
     const text = content.find((c) => c.type === 'output_text')?.text;
     if (!text) throw new Error(`OpenAI returned no text (status: ${body.status})`);
-    return structured ? JSON.parse(text) : extractJSON(text);
+
+    // input_tokens includes the cached ones; split them out so pricing can differ.
+    const u = body.usage ?? {};
+    const cached = u.input_tokens_details?.cached_tokens ?? 0;
+    const usage = { input: (u.input_tokens ?? 0) - cached, cached, cacheWrite: 0, output: u.output_tokens ?? 0 };
+    return { result: structured ? JSON.parse(text) : extractJSON(text), model: body.model ?? model, usage };
   },
 };

@@ -17,8 +17,11 @@
 //   // Optional one-time setup (model download, warm-up). Called from the options
 //   // page inside a click handler, since some backends require user activation.
 //   prepare?(config, { onProgress?: (fraction: number) => void }): Promise<void>;
-//   // Return the model's reply parsed as JSON conforming to `schema`.
-//   generate(request: { system: string, prompt: string, schema: object }, config): Promise<object>;
+//   // Return the model's reply parsed as JSON conforming to `schema`, the model id that
+//   // actually served it, and token usage ({ input, cached, cacheWrite, output }; null
+//   // when there is nothing to bill). `input` excludes cached tokens.
+//   generate(request: { system: string, prompt: string, schema: object }, config):
+//     Promise<{ result: object, model: string, usage: Usage | null }>;
 // }
 //
 // `config` is settings.providerConfig[provider.id] (API keys, model names, ...).

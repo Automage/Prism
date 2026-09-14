@@ -7,6 +7,10 @@ const TOP_ACCOUNTS = 25;
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString();
 const pct = (part, whole) => (whole ? `${Math.round((part / whole) * 100)}%` : '–');
+// Cheap models spend fractions of a cent per day, so show four decimals under a dollar.
+const fmtCost = (usd) => (usd === 0 ? '$0' : usd >= 1 ? `$${usd.toFixed(2)}` : `$${usd.toFixed(4)}`);
+const NO_USAGE = { requests: 0, input: 0, cached: 0, output: 0, cost: 0, unpriced: 0 };
+const tokensOf = (u) => u.input + u.cached + u.output;
 
 let stats = { installedAt: localDay(), days: {} };
 let period = 'all';
@@ -33,12 +37,20 @@ function daysInPeriod() {
   const days = [];
   for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
     const c = stats.days[localDay(d)];
-    days.push({ date: new Date(d), seen: c?.seen ?? 0, filtered: c?.filtered ?? 0, ads: c?.ads ?? 0, accounts: c?.accounts ?? {} });
+    days.push({
+      date: new Date(d),
+      seen: c?.seen ?? 0,
+      filtered: c?.filtered ?? 0,
+      ads: c?.ads ?? 0,
+      accounts: c?.accounts ?? {},
+      usage: { ...NO_USAGE, ...c?.usage },
+    });
   }
   return days;
 }
 
 const sum = (days, key) => days.reduce((n, d) => n + d[key], 0);
+const sumUsage = (days, key) => days.reduce((n, d) => n + d.usage[key], 0);
 
 // ---------- DOM helpers ----------
 
@@ -76,10 +88,17 @@ function renderTiles(days) {
   const filtered = sum(days, 'filtered');
   const tile = (label, value, note) =>
     el('div', { className: 'tile' }, el('div', { className: 'label', textContent: label }), el('div', { className: 'value', textContent: value }), note ? el('div', { className: 'note', textContent: note }) : null);
+
+  // Spend for the period, with today's figure always visible in the note.
+  const today = stats.days[localDay()]?.usage ?? NO_USAGE;
+  const unpriced = sumUsage(days, 'unpriced');
+  const spendNote = [`${fmtCost(today.cost ?? 0)} today`, unpriced ? `${fmt(unpriced)} request${unpriced === 1 ? '' : 's'} at unknown price` : null].filter(Boolean).join(' · ');
+
   $('stats-tiles').replaceChildren(
     tile('Posts seen', fmt(seen)),
     tile('Filtered', fmt(filtered), `${pct(filtered, seen)} of seen`),
     tile('Ads removed', fmt(sum(days, 'ads'))),
+    tile('Spent', fmtCost(sumUsage(days, 'cost')), spendNote),
   );
 }
 
@@ -163,6 +182,9 @@ function renderDaily(days, container) {
         keyed('div', 'var(--series-filtered)', el('b', { textContent: fmt(d.filtered) }), ` filtered (${pct(d.filtered, d.seen)})`),
         keyed('div', 'var(--series-shown)', el('b', { textContent: fmt(shown) }), ' shown'),
         el('div', { className: 'date', textContent: `${fmt(d.seen)} seen${d.ads ? ` · ${fmt(d.ads)} ads removed` : ''}` }),
+        d.usage.requests
+          ? el('div', { className: 'date', textContent: `${fmtCost(d.usage.cost)} · ${fmt(tokensOf(d.usage))} tokens · ${fmt(d.usage.requests)} requests` })
+          : null,
       );
       for (const line of [...tooltip.children].slice(1, 3)) line.className = 'line';
       tooltip.hidden = false;
@@ -184,9 +206,9 @@ function renderDaily(days, container) {
   const table = el(
     'table',
     { className: 'days' },
-    el('thead', {}, el('tr', {}, ...['Date', 'Seen', 'Filtered', '% filtered', 'Ads removed'].map((t) => el('th', { textContent: t })))),
+    el('thead', {}, el('tr', {}, ...['Date', 'Seen', 'Filtered', '% filtered', 'Ads removed', 'Tokens', 'Cost'].map((t) => el('th', { textContent: t })))),
     el('tbody', {}, ...[...days].reverse().map((d) =>
-      el('tr', {}, ...[longDate(d.date), fmt(d.seen), fmt(d.filtered), pct(d.filtered, d.seen), fmt(d.ads)].map((t) => el('td', { textContent: t }))),
+      el('tr', {}, ...[longDate(d.date), fmt(d.seen), fmt(d.filtered), pct(d.filtered, d.seen), fmt(d.ads), fmt(tokensOf(d.usage)), fmtCost(d.usage.cost)].map((t) => el('td', { textContent: t }))),
     )),
   );
   const details = el('details', {}, el('summary', { className: 'hint', textContent: 'Show as table' }), table);

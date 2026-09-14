@@ -1,7 +1,9 @@
 // Daily counts of posts seen / filtered / ads removed, kept in chrome.storage.local.
 // Everything stays on this machine.
 //
-// stats = { installedAt: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { seen, filtered, ads, accounts: { handle: [seen, filtered] } } } }
+// stats = { installedAt: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { seen, filtered, ads, accounts: { handle: [seen, filtered] }, usage } } }
+// usage = { requests, input, cached, output, cost, unpriced } — tokens and USD spent on the model
+// that day; `unpriced` counts requests whose model has no known price (excluded from cost).
 // statsToday = ids already counted today, so a post is counted once per day across tabs and reloads.
 
 export const STATS_KEY = 'stats';
@@ -62,5 +64,21 @@ export async function record(events) {
     counts[type]++;
     if (author) (counts.accounts[author] ??= [0, 0])[type === 'seen' ? 0 : 1]++;
   }
+  saveSoon();
+}
+
+// One model request: token usage ({ input, cached, cacheWrite, output } or null) and its
+// cost in USD (null when the model's price is unknown).
+export async function recordUsage(usage, cost) {
+  const { stats } = await load();
+  const day = localDay();
+  const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0, accounts: {} });
+  const u = (counts.usage ??= { requests: 0, input: 0, cached: 0, output: 0, cost: 0, unpriced: 0 });
+  u.requests++;
+  u.input += (usage?.input ?? 0) + (usage?.cacheWrite ?? 0);
+  u.cached += usage?.cached ?? 0;
+  u.output += usage?.output ?? 0;
+  if (cost === null) u.unpriced++;
+  else u.cost += cost;
   saveSoon();
 }

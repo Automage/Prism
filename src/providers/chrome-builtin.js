@@ -78,7 +78,8 @@ export default {
   async generate({ system, prompt, schema }) {
     const session = await (await baseSession(system)).clone();
     try {
-      return JSON.parse(await session.prompt(prompt, { responseConstraint: schema }));
+      const result = JSON.parse(await session.prompt(prompt, { responseConstraint: schema }));
+      return { result, model: 'gemini-nano', usage: null }; // on-device: nothing to bill
     } finally {
       session.destroy();
     }

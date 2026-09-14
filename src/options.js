@@ -1,5 +1,7 @@
 import { PROVIDERS } from './providers/index.js';
 import { DEFAULT_POLICY, getSettings, parseHandles } from './settings.js';
+import { clearLog, countLog, eachLogRow } from './log.js';
+import { localDay } from './stats.js';
 import { initStats } from './stats-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -190,5 +192,38 @@ $('test').addEventListener('click', async () => {
     Object.assign(document.createElement('summary'), { textContent: 'Raw model output' }),
     Object.assign(document.createElement('pre'), { textContent: JSON.stringify(result.raw, null, 2) }),
   );
-  out.append(verdict, ` · ${result.reason || 'no reason given'} · ${result.ms} ms`, details);
+  const cost = result.cost === null || result.cost === undefined ? '' : ` · $${result.cost.toFixed(5)}`;
+  out.append(verdict, ` · ${result.reason || 'no reason given'} · ${result.ms} ms${cost}`, details);
 });
+
+// ---------- log ----------
+
+async function refreshLogCount() {
+  try {
+    $('log-count').textContent = `${(await countLog()).toLocaleString()} posts logged`;
+  } catch (err) {
+    $('log-count').textContent = `Log unavailable: ${err?.message ?? err}`;
+  }
+}
+
+$('log-export').addEventListener('click', async () => {
+  $('log-export').disabled = true;
+  try {
+    const lines = [];
+    await eachLogRow((row) => lines.push(`${JSON.stringify(row)}\n`));
+    const url = URL.createObjectURL(new Blob(lines, { type: 'application/x-ndjson' }));
+    Object.assign(document.createElement('a'), { href: url, download: `prism-log-${localDay()}.jsonl` }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } finally {
+    $('log-export').disabled = false;
+  }
+});
+
+$('log-clear').addEventListener('click', async () => {
+  if (!confirm('Delete every logged post? This cannot be undone.')) return;
+  await clearLog();
+  refreshLogCount();
+});
+
+refreshLogCount();
+window.addEventListener('focus', refreshLogCount);

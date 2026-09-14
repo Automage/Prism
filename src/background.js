@@ -1,7 +1,9 @@
 import { PROVIDERS } from './providers/index.js';
 import { buildRequest, parseResponse } from './classify.js';
 import { DEFAULTS, VERDICT_KEYS, getSettings } from './settings.js';
-import { markInstalled, record } from './stats.js';
+import { localDay, markInstalled, record, recordUsage } from './stats.js';
+import { costOf } from './pricing.js';
+import { appendLog } from './log.js';
 
 const CACHE_KEY = 'verdictCache';
 const CACHE_LIMIT = 3000;
@@ -148,15 +150,20 @@ async function pump() {
 
 async function runBatch({ s, provider, config }, batch) {
   const tweets = batch.map((job) => job.tweet);
-  let verdicts;
+  let verdicts, model, usage;
   try {
-    const response = await callProvider(provider, 'generate', buildRequest(tweets, s.policy), config);
-    verdicts = parseResponse(response, tweets);
+    const res = await callProvider(provider, 'generate', buildRequest(tweets, s.policy), config);
+    ({ model, usage } = res);
+    verdicts = parseResponse(res.result, tweets);
     lastError = null;
   } catch (err) {
     fail(batch, err);
     return;
   }
+  const cost = costOf(provider.id, model, usage);
+  recordUsage(usage, cost);
+  logBatch({ provider: provider.id, model, policy: s.policy, tweets, verdicts, usage, cost });
+
   const sig = signature(await settings());
   const bySubscriber = new Map();
   batch.forEach((job, i) => {
@@ -171,6 +178,32 @@ async function runBatch({ s, provider, config }, batch) {
   });
   for (const [sub, v] of bySubscriber) deliver(sub, v);
   saveCacheSoon();
+}
+
+// One log row per post, sharing a batch id. Logged even if the policy changed mid-flight:
+// the analysis happened, and the row records which policy it ran under.
+function logBatch({ provider, model, policy, tweets, verdicts, usage, cost }) {
+  const at = Date.now();
+  const batch = `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const rows = tweets.map((tweet, i) => ({
+    at,
+    day: localDay(new Date(at)),
+    batch,
+    provider,
+    model,
+    policy: hash(policy),
+    id: tweet.id,
+    author: tweet.author ?? '',
+    text: tweet.text ?? '',
+    quoted: tweet.quoted ?? null,
+    media: tweet.media ?? [],
+    verdict: verdicts[i].verdict,
+    reason: verdicts[i].reason,
+    batchSize: tweets.length,
+    usage,
+    cost,
+  }));
+  appendLog(rows).catch((err) => console.warn('[prism] log write failed:', err?.message ?? err));
 }
 
 // Rate limits, overload, timeouts and network hiccups are worth retrying; bad keys,
@@ -264,8 +297,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       currentProvider()
         .then(async ({ s, provider, config }) => {
           const policy = msg.policy ?? s.policy;
-          const response = await callProvider(provider, 'generate', buildRequest([tweet], policy), config);
-          return { ...parseResponse(response, [tweet])[0], ms: Math.round(performance.now() - started), raw: response };
+          const { result, model, usage } = await callProvider(provider, 'generate', buildRequest([tweet], policy), config);
+          const cost = costOf(provider.id, model, usage);
+          recordUsage(usage, cost); // a real request, so it counts toward spend (but isn't logged)
+          return { ...parseResponse(result, [tweet])[0], ms: Math.round(performance.now() - started), raw: result, model, cost };
         })
         .catch((err) => ({ error: err?.message ?? String(err) }))
         .then(sendResponse);
