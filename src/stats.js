@@ -1,10 +1,14 @@
 // Daily counts of posts seen / filtered / ads removed, kept in chrome.storage.local.
 // Everything stays on this machine.
 //
-// stats = { installedAt: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { seen, filtered, ads, accounts: { handle: [seen, filtered] }, usage } } }
+// stats = { installedAt: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { seen, filtered, ads, viewers, usage } } }
+// Day-level counts are totals across every logged-in X account; viewers splits them by
+// account: { handle: { seen, filtered, ads } }. Events with no detectable account only
+// count toward the totals.
 // usage = { requests, input, cached, output, cost, unpriced } — tokens and USD spent on the model
 // that day; `unpriced` counts requests whose model has no known price (excluded from cost).
-// statsToday = ids already counted today, so a post is counted once per day across tabs and reloads.
+// statsToday = "viewer|tweetId" keys already counted today, so a post is counted once per day
+// per account across tabs and reloads.
 
 export const STATS_KEY = 'stats';
 const TODAY_KEY = 'statsToday';
@@ -19,6 +23,7 @@ let saveTimer = null;
 function load() {
   return (loaded ??= chrome.storage.local.get([STATS_KEY, TODAY_KEY]).then((stored) => {
     const stats = stored[STATS_KEY] ?? { installedAt: localDay(), days: {} };
+    for (const day of Object.values(stats.days)) delete day.accounts; // pre-viewer per-author breakdown
     const t = stored[TODAY_KEY];
     const today = { day: t?.day, seen: new Set(t?.seen), filtered: new Set(t?.filtered), ad: new Set(t?.ad) };
     return { stats, today };
@@ -43,7 +48,7 @@ export async function markInstalled() {
   saveSoon();
 }
 
-// events: [{ type: 'seen' | 'filtered' | 'ad', id, author }]
+// events: [{ type: 'seen' | 'filtered' | 'ad', id, viewer }] — viewer is the logged-in handle, or ''.
 export async function record(events) {
   const { stats, today } = await load();
   const day = localDay();
@@ -51,18 +56,16 @@ export async function record(events) {
     today.day = day;
     for (const type of ['seen', 'filtered', 'ad']) today[type].clear();
   }
-  const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0, accounts: {} });
-  for (const { type, id, author } of events) {
+  const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0 });
+  for (const { type, id, viewer = '' } of events) {
     const done = today[type];
-    if (!done || done.has(id)) continue;
-    if (type === 'filtered' && !today.seen.has(id)) continue; // only count posts seen today
-    done.add(id);
-    if (type === 'ad') {
-      counts.ads++;
-      continue;
-    }
-    counts[type]++;
-    if (author) (counts.accounts[author] ??= [0, 0])[type === 'seen' ? 0 : 1]++;
+    const key = `${viewer}|${id}`;
+    if (!done || done.has(key)) continue;
+    if (type === 'filtered' && !today.seen.has(key)) continue; // only count posts seen today
+    done.add(key);
+    const field = type === 'ad' ? 'ads' : type;
+    counts[field]++;
+    if (viewer) ((counts.viewers ??= {})[viewer] ??= { seen: 0, filtered: 0, ads: 0 })[field]++;
   }
   saveSoon();
 }
@@ -72,7 +75,7 @@ export async function record(events) {
 export async function recordUsage(usage, cost) {
   const { stats } = await load();
   const day = localDay();
-  const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0, accounts: {} });
+  const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0 });
   const u = (counts.usage ??= { requests: 0, input: 0, cached: 0, output: 0, cost: 0, unpriced: 0 });
   u.requests++;
   u.input += (usage?.input ?? 0) + (usage?.cacheWrite ?? 0);

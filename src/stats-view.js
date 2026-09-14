@@ -1,9 +1,10 @@
 // Stats section of the options page: totals, a daily stacked-column chart
-// (shown + filtered = seen) and a per-account breakdown, all for one selected period.
+// (shown + filtered = seen) and spend, for one selected period and one logged-in
+// X account (or all of them).
 import { STATS_KEY, localDay } from './stats.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const TOP_ACCOUNTS = 25;
+const ALL = '*';
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString();
 const pct = (part, whole) => (whole ? `${Math.round((part / whole) * 100)}%` : '–');
@@ -14,9 +15,7 @@ const tokensOf = (u) => u.input + u.cached + u.output;
 
 let stats = { installedAt: localDay(), days: {} };
 let period = 'all';
-let view = 'day';
-let accountSort = 'seen';
-let showAllAccounts = false;
+let viewer = ALL;
 
 // ---------- data ----------
 
@@ -25,7 +24,17 @@ function parseDay(key) {
   return new Date(y, m - 1, d);
 }
 
-// One entry per calendar day in the selected period, zero-filled.
+// Every account that has ever been counted, most active first.
+function viewers() {
+  const totals = new Map();
+  for (const day of Object.values(stats.days)) {
+    for (const [handle, v] of Object.entries(day.viewers ?? {})) totals.set(handle, (totals.get(handle) ?? 0) + v.seen);
+  }
+  return [...totals].sort((a, b) => b[1] - a[1]).map(([handle]) => handle);
+}
+
+// One entry per calendar day in the selected period, zero-filled. Post counts are for the
+// selected account; spend is per API key, so it's always the day's total.
 function daysInPeriod() {
   const today = parseDay(localDay());
   let start = parseDay(stats.installedAt ?? localDay());
@@ -37,12 +46,12 @@ function daysInPeriod() {
   const days = [];
   for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
     const c = stats.days[localDay(d)];
+    const counts = viewer === ALL ? c : c?.viewers?.[viewer];
     days.push({
       date: new Date(d),
-      seen: c?.seen ?? 0,
-      filtered: c?.filtered ?? 0,
-      ads: c?.ads ?? 0,
-      accounts: c?.accounts ?? {},
+      seen: counts?.seen ?? 0,
+      filtered: counts?.filtered ?? 0,
+      ads: counts?.ads ?? 0,
       usage: { ...NO_USAGE, ...c?.usage },
     });
   }
@@ -78,6 +87,23 @@ function legend() {
     { className: 'legend' },
     keyed('span', 'var(--series-shown)', 'Shown'),
     keyed('span', 'var(--series-filtered)', 'Filtered'),
+  );
+}
+
+// ---------- account picker ----------
+
+function renderViewers() {
+  const handles = viewers();
+  if (!handles.includes(viewer)) viewer = ALL;
+  const seg = $('stats-viewer');
+  seg.hidden = handles.length === 0;
+  seg.replaceChildren(
+    ...[[ALL, 'All accounts'], ...handles.map((h) => [h, `@${h}`])].map(([value, text]) => {
+      const b = el('button', { textContent: text });
+      b.dataset.viewer = value;
+      b.setAttribute('aria-pressed', String(value === viewer));
+      return b;
+    }),
   );
 }
 
@@ -216,81 +242,18 @@ function renderDaily(days, container) {
   container.replaceChildren(legend(), wrap, details);
 }
 
-// ---------- by account ----------
-
-function renderAccounts(days, container) {
-  const totals = new Map();
-  for (const d of days) {
-    for (const [handle, [seen, filtered]] of Object.entries(d.accounts)) {
-      const t = totals.get(handle) ?? [0, 0];
-      t[0] += seen;
-      t[1] += filtered;
-      totals.set(handle, t);
-    }
-  }
-  const idx = accountSort === 'seen' ? 0 : 1;
-  const rows = [...totals].sort((a, b) => b[1][idx] - a[1][idx] || b[1][1 - idx] - a[1][1 - idx]);
-  const shownRows = showAllAccounts ? rows : rows.slice(0, TOP_ACCOUNTS);
-  const max = Math.max(1, ...rows.map(([, [seen]]) => seen));
-
-  const sort = el('div', { className: 'seg', role: 'group', ariaLabel: 'Sort accounts' });
-  for (const [key, text] of [['seen', 'Most seen'], ['filtered', 'Most filtered']]) {
-    const b = el('button', { textContent: text });
-    b.setAttribute('aria-pressed', String(accountSort === key));
-    b.addEventListener('click', () => {
-      accountSort = key;
-      render();
-    });
-    sort.append(b);
-  }
-
-  const list = el('div', { className: 'accounts' });
-  for (const [handle, [seen, filtered]] of shownRows) {
-    const bar = el('div', { className: 'hbar' });
-    for (const [n, color] of [[seen - filtered, 'var(--series-shown)'], [filtered, 'var(--series-filtered)']]) {
-      if (!n) continue;
-      const seg = el('i');
-      seg.style.width = `${(n / max) * 100}%`;
-      seg.style.background = color;
-      bar.append(seg);
-    }
-    list.append(
-      el('a', { href: `https://x.com/${encodeURIComponent(handle)}`, target: '_blank', rel: 'noreferrer', textContent: `@${handle}` }),
-      bar,
-      el('span', { className: 'nums', textContent: `${fmt(seen)} seen · ${fmt(filtered)} filtered` }),
-    );
-  }
-
-  const more = rows.length > TOP_ACCOUNTS
-    ? el('button', { className: 'secondary', textContent: showAllAccounts ? 'Show top 25' : `Show all ${fmt(rows.length)} accounts` })
-    : null;
-  more?.addEventListener('click', () => {
-    showAllAccounts = !showAllAccounts;
-    render();
-  });
-
-  container.replaceChildren(
-    el('div', { className: 'controls' }, sort, el('span', { className: 'hint', textContent: `${fmt(rows.length)} accounts` })),
-    legend(),
-    list,
-    ...(more ? [el('div', { className: 'row' }, more)] : []),
-  );
-}
-
 // ---------- wiring ----------
 
 function render() {
+  renderViewers();
   const days = daysInPeriod();
   for (const b of $('stats-period').children) b.setAttribute('aria-pressed', String(b.dataset.period === period));
-  for (const b of $('stats-view').children) b.setAttribute('aria-pressed', String(b.dataset.view === view));
   renderTiles(days);
   const body = $('stats-body');
   if (!sum(days, 'seen') && !sum(days, 'ads')) {
     body.replaceChildren(el('div', { className: 'empty', textContent: 'Nothing counted yet for this period. Scroll your X feed and check back.' }));
-  } else if (view === 'day') {
-    renderDaily(days, body);
   } else {
-    renderAccounts(days, body);
+    renderDaily(days, body);
   }
 }
 
@@ -301,9 +264,9 @@ export async function initStats() {
     period = e.target.dataset.period;
     render();
   });
-  $('stats-view').addEventListener('click', (e) => {
-    if (!e.target.dataset.view) return;
-    view = e.target.dataset.view;
+  $('stats-viewer').addEventListener('click', (e) => {
+    if (!e.target.dataset.viewer) return;
+    viewer = e.target.dataset.viewer;
     render();
   });
   // Live: counts update while you scroll X in another tab.
@@ -316,7 +279,7 @@ export async function initStats() {
   let lastWidth = 0;
   new ResizeObserver(([entry]) => {
     const w = Math.round(entry.contentRect.width);
-    if (w !== lastWidth && view === 'day') {
+    if (w !== lastWidth) {
       lastWidth = w;
       render();
     }

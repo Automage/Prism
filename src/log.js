@@ -3,10 +3,11 @@
 // it grows until you clear it from the settings page. Nothing leaves your machine.
 //
 // One row per post:
-// { at, day, batch, provider, model, policy, id, author, text, quoted, media,
+// { at, day, batch, provider, model, policy, viewer, id, author, text, quoted, media,
 //   verdict, reason, batchSize, usage, cost }
-// `batch` groups posts that went out in the same request; `usage` and `cost` are for that
-// whole request and are repeated on each of its rows.
+// `viewer` is the X account that was logged in; `author` wrote the post. `batch` groups
+// posts that went out in the same request; `usage` and `cost` are for that whole request
+// and are repeated on each of its rows.
 
 const DB_NAME = 'prism';
 const STORE = 'log';

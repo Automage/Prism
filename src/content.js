@@ -19,6 +19,7 @@
   const outbox = { true: new Map(), false: new Map() }; // keyed by priority
   let settings = null;
   let whitelist = new Set(); // lowercase handles from settings.whitelist
+  let viewerHandle = ''; // the logged-in X account, once found
   let alive = true;
   let flushTimer = null;
   let scanQueued = false;
@@ -71,7 +72,7 @@
       if (!box.size) continue;
       const tweets = [...box.values()];
       box.clear();
-      send({ type: 'classify', tweets, priority }).catch(() => {
+      send({ type: 'classify', tweets, priority, viewer: viewer() }).catch(() => {
         for (const t of tweets) settle(t.id, KEEP);
         applyAll();
       });
@@ -100,18 +101,31 @@
     applyAll();
   });
 
+  // ---------- viewer ----------
+  // The logged-in X account, from the nav's profile link (present even in the icon-only
+  // layout) or the account switcher's text. Switching accounts reloads the page, so the
+  // first hit is kept for the life of this script.
+
+  function viewer() {
+    if (viewerHandle) return viewerHandle;
+    const href = document.querySelector('[data-testid="AppTabBar_Profile_Link"]')?.getAttribute('href') ?? '';
+    const fromLink = href.match(/^\/(\w{1,15})$/)?.[1];
+    const fromSwitcher = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]')?.textContent.match(/@(\w{1,15})/)?.[1];
+    return (viewerHandle = (fromLink ?? fromSwitcher ?? '').toLowerCase());
+  }
+
   // ---------- stats ----------
   // A post is "seen" once any of it has been on screen, and "filtered" if it was seen and
   // its verdict is filter (even if revealed later). Ads count once they reach the page.
   // The background dedupes per day; these sets just avoid resending within this page.
 
-  const seen = new Map(); // tweetId -> author
+  const seen = new Set(); // tweetIds
   const counted = { filtered: new Set(), ad: new Set() };
   let statEvents = [];
   let statsTimer = null;
 
-  function count(type, id, author) {
-    statEvents.push({ type, id, author });
+  function count(type, id) {
+    statEvents.push({ type, id, viewer: viewer() });
     statsTimer ??= setTimeout(() => {
       statsTimer = null;
       const events = statEvents;
@@ -123,9 +137,8 @@
   function countSeen(article) {
     const id = article.dataset.icId;
     if (!id || seen.has(id) || verdicts.get(id)?.ad) return;
-    const author = handleOf(article, id);
-    seen.set(id, author);
-    count('seen', id, author);
+    seen.add(id);
+    count('seen', id);
     countFiltered(id);
   }
 
@@ -133,7 +146,7 @@
     const v = verdicts.get(id);
     if (v?.verdict !== 'filter' || v.ad || !seen.has(id) || counted.filtered.has(id)) return;
     counted.filtered.add(id);
-    count('filtered', id, seen.get(id));
+    count('filtered', id);
   }
 
   function countAd(id) {

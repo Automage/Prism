@@ -94,11 +94,12 @@ async function currentProvider() {
 // ---------- classification queue ----------
 
 const queue = []; // jobs waiting for the model, front = next
-const jobs = new Map(); // tweetId -> { tweet, sig, subscribers: Set<"tabId:frameId"> }
+const jobs = new Map(); // tweetId -> { tweet, sig, viewer, subscribers: Set<"tabId:frameId"> }
 let inFlight = 0;
 let lastError = null;
 
-async function classify(tweets, subscriber, priority) {
+// viewer: the X account logged in on the requesting tab (recorded in the log, first requester wins).
+async function classify(tweets, subscriber, priority, viewer = '') {
   const sig = signature(await settings());
   const known = await loadCache(sig);
   const hits = {};
@@ -110,7 +111,7 @@ async function classify(tweets, subscriber, priority) {
     }
     let job = jobs.get(tweet.id);
     if (!job) {
-      job = { tweet, sig, subscribers: new Set() };
+      job = { tweet, sig, viewer, subscribers: new Set() };
       jobs.set(tweet.id, job);
       queue.push(job);
     }
@@ -162,7 +163,7 @@ async function runBatch({ s, provider, config }, batch) {
   }
   const cost = costOf(provider.id, model, usage);
   recordUsage(usage, cost);
-  logBatch({ provider: provider.id, model, policy: s.policy, tweets, verdicts, usage, cost });
+  logBatch({ provider: provider.id, model, policy: s.policy, batch, verdicts, usage, cost });
 
   const sig = signature(await settings());
   const bySubscriber = new Map();
@@ -182,16 +183,17 @@ async function runBatch({ s, provider, config }, batch) {
 
 // One log row per post, sharing a batch id. Logged even if the policy changed mid-flight:
 // the analysis happened, and the row records which policy it ran under.
-function logBatch({ provider, model, policy, tweets, verdicts, usage, cost }) {
+function logBatch({ provider, model, policy, batch, verdicts, usage, cost }) {
   const at = Date.now();
-  const batch = `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  const rows = tweets.map((tweet, i) => ({
+  const batchId = `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const rows = batch.map(({ tweet, viewer }, i) => ({
     at,
     day: localDay(new Date(at)),
-    batch,
+    batch: batchId,
     provider,
     model,
     policy: hash(policy),
+    viewer,
     id: tweet.id,
     author: tweet.author ?? '',
     text: tweet.text ?? '',
@@ -199,7 +201,7 @@ function logBatch({ provider, model, policy, tweets, verdicts, usage, cost }) {
     media: tweet.media ?? [],
     verdict: verdicts[i].verdict,
     reason: verdicts[i].reason,
-    batchSize: tweets.length,
+    batchSize: batch.length,
     usage,
     cost,
   }));
@@ -270,7 +272,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     case 'classify':
       // Verdicts are pushed back to the tab as each batch finishes; this is just an ack.
-      if (sender.tab) classify(msg.tweets, `${sender.tab.id}:${sender.frameId}`, msg.priority);
+      if (sender.tab) classify(msg.tweets, `${sender.tab.id}:${sender.frameId}`, msg.priority, msg.viewer);
       sendResponse({ ok: true });
       return false;
 
