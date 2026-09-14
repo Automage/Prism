@@ -76,8 +76,9 @@ content.js (isolated world)  ◀───────────┘          �
   logged-in handle is read from the page's own navigation, never from cookies.
 - **Cost**: providers report token usage per request; `src/pricing.js` turns it into dollars
   from a list-price table. Spend shows as a tile (period total, plus today), in the chart
-  tooltip and in the day table. A model missing from the table counts tokens but not dollars,
-  and the tile says how many requests went unpriced. Only Prism's own requests are counted.
+  tooltip and in the day table, and follows the account picker like the other numbers. A
+  model missing from the table counts tokens but not dollars, and the tile says how many
+  requests went unpriced. Only Prism's own requests are counted.
 - **Log** (settings page → *Log*): one row per post sent to the model, in IndexedDB. Ads,
   whitelisted and media-only posts never reach the model so aren't logged; cache hits aren't
   logged again. Export as JSONL for `jq` or pandas, or clear it.

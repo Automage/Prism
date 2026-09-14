@@ -3,8 +3,8 @@
 //
 // stats = { installedAt: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { seen, filtered, ads, viewers, usage } } }
 // Day-level counts are totals across every logged-in X account; viewers splits them by
-// account: { handle: { seen, filtered, ads } }. Events with no detectable account only
-// count toward the totals.
+// account: { handle: { seen, filtered, ads, usage } }. Events with no detectable account
+// only count toward the totals.
 // usage = { requests, input, cached, output, cost, unpriced } — tokens and USD spent on the model
 // that day; `unpriced` counts requests whose model has no known price (excluded from cost).
 // statsToday = "viewer|tweetId" keys already counted today, so a post is counted once per day
@@ -70,18 +70,22 @@ export async function record(events) {
   saveSoon();
 }
 
-// One model request: token usage ({ input, cached, cacheWrite, output } or null) and its
-// cost in USD (null when the model's price is unknown).
-export async function recordUsage(usage, cost) {
+// One model request: token usage ({ input, cached, cacheWrite, output } or null), its
+// cost in USD (null when the model's price is unknown), and the account whose tab asked.
+export async function recordUsage(usage, cost, viewer = '') {
   const { stats } = await load();
   const day = localDay();
   const counts = (stats.days[day] ??= { seen: 0, filtered: 0, ads: 0 });
-  const u = (counts.usage ??= { requests: 0, input: 0, cached: 0, output: 0, cost: 0, unpriced: 0 });
-  u.requests++;
-  u.input += (usage?.input ?? 0) + (usage?.cacheWrite ?? 0);
-  u.cached += usage?.cached ?? 0;
-  u.output += usage?.output ?? 0;
-  if (cost === null) u.unpriced++;
-  else u.cost += cost;
+  const buckets = [counts];
+  if (viewer) buckets.push((counts.viewers ??= {})[viewer] ??= { seen: 0, filtered: 0, ads: 0 });
+  for (const bucket of buckets) {
+    const u = (bucket.usage ??= { requests: 0, input: 0, cached: 0, output: 0, cost: 0, unpriced: 0 });
+    u.requests++;
+    u.input += (usage?.input ?? 0) + (usage?.cacheWrite ?? 0);
+    u.cached += usage?.cached ?? 0;
+    u.output += usage?.output ?? 0;
+    if (cost === null) u.unpriced++;
+    else u.cost += cost;
+  }
   saveSoon();
 }

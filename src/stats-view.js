@@ -1,6 +1,7 @@
 // Stats section of the options page: totals, a daily stacked-column chart
 // (shown + filtered = seen) and spend, for one selected period and one logged-in
-// X account (or all of them).
+// X account (or all of them). Requests made before per-account spend existed, and
+// "Try it" requests, only count under "All accounts".
 import { STATS_KEY, localDay } from './stats.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -33,8 +34,10 @@ function viewers() {
   return [...totals].sort((a, b) => b[1] - a[1]).map(([handle]) => handle);
 }
 
-// One entry per calendar day in the selected period, zero-filled. Post counts are for the
-// selected account; spend is per API key, so it's always the day's total.
+// The day's counts for the selected account (or the day's totals).
+const countsFor = (day) => (viewer === ALL ? day : day?.viewers?.[viewer]);
+
+// One entry per calendar day in the selected period, zero-filled.
 function daysInPeriod() {
   const today = parseDay(localDay());
   let start = parseDay(stats.installedAt ?? localDay());
@@ -45,14 +48,13 @@ function daysInPeriod() {
   }
   const days = [];
   for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
-    const c = stats.days[localDay(d)];
-    const counts = viewer === ALL ? c : c?.viewers?.[viewer];
+    const counts = countsFor(stats.days[localDay(d)]);
     days.push({
       date: new Date(d),
       seen: counts?.seen ?? 0,
       filtered: counts?.filtered ?? 0,
       ads: counts?.ads ?? 0,
-      usage: { ...NO_USAGE, ...c?.usage },
+      usage: { ...NO_USAGE, ...counts?.usage },
     });
   }
   return days;
@@ -116,7 +118,7 @@ function renderTiles(days) {
     el('div', { className: 'tile' }, el('div', { className: 'label', textContent: label }), el('div', { className: 'value', textContent: value }), note ? el('div', { className: 'note', textContent: note }) : null);
 
   // Spend for the period, with today's figure always visible in the note.
-  const today = stats.days[localDay()]?.usage ?? NO_USAGE;
+  const today = countsFor(stats.days[localDay()])?.usage ?? NO_USAGE;
   const unpriced = sumUsage(days, 'unpriced');
   const spendNote = [`${fmtCost(today.cost ?? 0)} today`, unpriced ? `${fmt(unpriced)} request${unpriced === 1 ? '' : 's'} at unknown price` : null].filter(Boolean).join(' · ');
 

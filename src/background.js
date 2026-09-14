@@ -162,7 +162,7 @@ async function runBatch({ s, provider, config }, batch) {
     return;
   }
   const cost = costOf(provider.id, model, usage);
-  recordUsage(usage, cost);
+  recordUsage(usage, cost, batch[0].viewer); // a batch is almost always one account's posts
   logBatch({ provider: provider.id, model, policy: s.policy, batch, verdicts, usage, cost });
 
   const sig = signature(await settings());
