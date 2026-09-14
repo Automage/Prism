@@ -25,6 +25,7 @@ No build step. Requires Chrome 138+.
    - **Model**: OpenAI (default) or Anthropic with an API key, or Chrome built-in (click
      **Download model** the first time; a few GB, and Chrome wants ~22 GB free disk).
    - **Filter rules**: what to hide. **Try it** tests the rules against a single post.
+     **Always show** lists accounts (e.g. `@paulg`) whose posts are never filtered.
 4. Open x.com. Filtered posts are blurred (or collapsed) with a "Filtered" label; click one to
    show it. Options can add the author's @handle and the model's reason to the label.
    The toolbar badge counts filtered posts in the tab, or shows `!` if the model failed.
@@ -60,6 +61,8 @@ content.js (isolated world)  ◀───────────┘          �
   them; anything else is classified once it's on screen. Tweets not seen on the network fall
   back to DOM scraping.
 - **Ads** (promoted tweets) are always removed from the timeline, without a model call.
+- **Whitelist**: posts by listed accounts are shown without a model call (for a retweet, the
+  original author is what counts). Ads from them are still removed.
 - **Fail open**: errors show the tweet. Rate limits and other transient errors are retried a
   couple of times first, with a small spinner on the post while it waits. Media-only tweets
   are never filtered.

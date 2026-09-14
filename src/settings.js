@@ -16,10 +16,20 @@ export const DEFAULTS = {
   holdPending: true, // blur tweets until they've been classified
   showReasons: false, // show the model's reason on filtered posts, not just "Filtered"
   showHandle: false, // show the author's @handle on filtered posts
+  whitelist: [], // lowercase handles (no @) whose posts are never sent to the model; ads are still removed
 };
 
 export async function getSettings() {
   return chrome.storage.local.get(DEFAULTS);
+}
+
+// "@PaulG, sama https://x.com/pmarca" -> ['paulg', 'sama', 'pmarca']
+export function parseHandles(text) {
+  const handles = text
+    .split(/[\s,;]+/)
+    .map((h) => h.replace(/\/+$/, '').replace(/^.*\//, '').replace(/^@/, '').toLowerCase())
+    .filter((h) => /^\w{1,15}$/.test(h));
+  return [...new Set(handles)];
 }
 
 // Settings that change which verdict a tweet gets; changing any of these invalidates the cache.

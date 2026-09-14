@@ -1,5 +1,5 @@
 import { PROVIDERS } from './providers/index.js';
-import { DEFAULT_POLICY, getSettings } from './settings.js';
+import { DEFAULT_POLICY, getSettings, parseHandles } from './settings.js';
 import { initStats } from './stats-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -86,6 +86,42 @@ for (const key of ['showHandle', 'showReasons']) {
   $(key).checked = settings[key];
   $(key).addEventListener('change', (e) => set({ [key]: e.target.checked }));
 }
+
+// ---------- whitelist ----------
+// Saved on every add/remove; the background keeps its verdict cache, so this is cheap.
+
+function renderWhitelist() {
+  $('whitelist').replaceChildren(
+    ...settings.whitelist.map((handle) => {
+      const remove = Object.assign(document.createElement('button'), {
+        type: 'button',
+        textContent: '×',
+        title: `Remove @${handle}`,
+        ariaLabel: `Remove @${handle}`,
+      });
+      remove.addEventListener('click', () => saveWhitelist(settings.whitelist.filter((h) => h !== handle)));
+      const chip = Object.assign(document.createElement('span'), { className: 'chip', textContent: `@${handle}` });
+      chip.append(remove);
+      return chip;
+    }),
+  );
+}
+
+async function saveWhitelist(whitelist) {
+  await set({ whitelist });
+  settings = await getSettings();
+  renderWhitelist();
+}
+
+$('whitelist-input').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const input = e.target;
+  const added = parseHandles(input.value).filter((h) => !settings.whitelist.includes(h));
+  input.value = '';
+  if (added.length) saveWhitelist([...settings.whitelist, ...added]);
+});
+renderWhitelist();
 
 // ---------- model status ----------
 

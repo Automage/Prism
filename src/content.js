@@ -2,7 +2,9 @@
 // verdicts, and blurs/collapses the ones that should be filtered.
 (() => {
   const SOURCE = 'prism:tweets';
-  const DISPLAY_KEYS = ['enabled', 'mode', 'holdPending', 'showReasons', 'showHandle']; // any other setting change invalidates verdicts
+  // Any other setting change invalidates local verdicts. (For the whitelist that's cheap:
+  // the background keeps its cache, so re-requested tweets come straight back.)
+  const DISPLAY_KEYS = ['enabled', 'mode', 'holdPending', 'showReasons', 'showHandle'];
   const FLUSH_MS = 120;
   const STALE_MS = 60_000;
   const RETRY_MS = 10_000; // after a transient provider error (rate limit, 5xx, timeout)
@@ -16,12 +18,19 @@
   const revealed = new Set(); // tweetIds the user clicked to show
   const outbox = { true: new Map(), false: new Map() }; // keyed by priority
   let settings = null;
+  let whitelist = new Set(); // lowercase handles from settings.whitelist
   let alive = true;
   let flushTimer = null;
   let scanQueued = false;
 
   const KEEP = { verdict: 'keep', reason: '' };
   const AD = { verdict: 'filter', reason: 'Ad', ad: true }; // ads are always removed, no model call
+  const WHITELISTED = { verdict: 'keep', reason: 'Whitelisted' }; // author is on the user's list, no model call
+
+  // Matches the post's author (for a retweet, the original author), not who retweeted it.
+  function whitelisted(tweet) {
+    return whitelist.has((tweet.author || '').toLowerCase());
+  }
 
   // ---------- messaging ----------
 
@@ -145,6 +154,7 @@
       known.set(tweet.id, tweet);
       if (known.size > MAX_KNOWN) known.delete(known.keys().next().value);
       if (tweet.promoted) settle(tweet.id, AD);
+      else if (whitelisted(tweet)) settle(tweet.id, WHITELISTED);
       // Only feeds are classified ahead of time; everything else waits until it's on screen.
       else if (e.data.prefetch && settings?.enabled && hasText(tweet)) request(tweet, false);
     }
@@ -284,7 +294,8 @@
       settle(id, AD);
     } else if (!verdicts.has(id)) {
       const tweet = known.get(id) ?? scrape(article, id);
-      if (hasText(tweet)) request(tweet, true);
+      if (whitelisted(tweet)) settle(id, WHITELISTED);
+      else if (hasText(tweet)) request(tweet, true);
       else settle(id, KEEP); // media-only; nothing for a text model to judge
     }
     if (verdicts.get(id)?.ad) countAd(id);
@@ -315,6 +326,10 @@
 
   // ---------- settings ----------
 
+  function loadWhitelist() {
+    whitelist = new Set((settings.whitelist ?? []).map((h) => String(h).toLowerCase()));
+  }
+
   chrome.storage.onChanged.addListener((changes, area) => {
     // The background writes its cache and stats here every second or so; ignore those.
     if (area !== 'local' || !settings || !Object.keys(changes).some((key) => key in settings)) return;
@@ -324,6 +339,7 @@
       settings[key] = newValue;
       if (!DISPLAY_KEYS.includes(key)) invalidate = true;
     }
+    loadWhitelist();
     if (invalidate) {
       verdicts.clear();
       requested.clear();
@@ -337,6 +353,7 @@
   send({ type: 'getSettings' })
     .then((s) => {
       settings = s;
+      loadWhitelist();
       queueScan();
     })
     .catch(() => {});

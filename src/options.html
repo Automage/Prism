@@ -31,6 +31,10 @@
     textarea, select, .field input, .field select { width: 100%; box-sizing: border-box; background: var(--field); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; }
     textarea { min-height: 210px; resize: vertical; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
     #test-text { min-height: 80px; font: inherit; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px 3px 10px; font-size: 13px; }
+    .chip button { background: transparent; color: var(--muted); padding: 0 4px; font-size: 15px; line-height: 1; font-weight: 400; }
+    .chip button:hover { color: var(--bad); }
     button { background: var(--fg); color: var(--bg); border: 0; border-radius: 999px; padding: 8px 16px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
     button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
     button:disabled { opacity: 0.5; cursor: default; }
@@ -124,6 +128,16 @@
         <button class="secondary" id="reset">Reset to default</button>
         <span class="hint" id="saved" hidden>Saved. Verdicts will be recomputed.</span>
       </div>
+    </section>
+
+    <section>
+      <h2>Always show</h2>
+      <p class="hint">Posts from these accounts are never filtered or sent to the model. Ads are still removed.</p>
+      <label class="field">
+        <span>Add an account and press Enter</span>
+        <input id="whitelist-input" placeholder="@paulg" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="chips" id="whitelist"></div>
     </section>
 
     <section>
